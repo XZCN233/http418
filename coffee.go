@@ -1,0 +1,180 @@
+package main
+
+import (
+	"bufio"
+	"bytes"
+	"crypto/tls"
+	"log"
+	"net"
+	"time"
+)
+
+const certPEM = `-----BEGIN CERTIFICATE-----
+MIIDDjCCAfagAwIBAgISBV7QtOuwQ0gAcW8Ss4s6XiWoMA0GCSqGSIb3DQEBCwUA
+MDIxCzAJBgNVBAYTAlVTMRYwFAYDVQQKEw1MZXQncyBFbmNyeXB0MQswCQYDVQQD
+EwJFODAeFw0yNTA5MjIwMTQ0MzRaFw0yNTEyMjEwMTQ0MzNaMBcxFTATBgNVBAMM
+DCoua3phLm9yZy5rcDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMmP
+ls4ekLk6d0ZUMHl3fCzZBPOlOI2Hl6Gp8h6UnE61RaKaJ8LZkfNYtvjboMMAKQWH
+NHhKKFXsSX5cjusilTit1FfzwV5pHBPY2bHSyKDJdENX5Zkl/FNh8ebDYmpstX9H
+GynPl2ihQtKY85ap4hPaSkcCElJqv0+Zxw0yiL9ZKTsD1NPPkz1dX8TKtQ7wRfsy
+F2h0yZYnI0hkVrVNaXZLpYB6WZC1VbkyQNKNwqQTotiTofyJETmmSAjpsDJnO+Jp
+MlHi0o5/Jyxx7HeQG9lLClC+V5mkmNIgqaeqpd/JbgucU2HdIY3Ubj8c8qLKdtr1
+ppDsq1NscCTmNW8F9QECAwEAAaM5MDcwDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8E
+BAMCB4AwFwYDVR0RBBAwDoIMKi5remEub3JnLmtwMA0GCSqGSIb3DQEBCwUAA4IB
+AQAYO5zxsxEsVKgfUBH3lo1+MjRJhu+6NM1zrbnLPPdgVuY8gaB/tIGR/TQ7CHRH
+LXJRTipesPbWWxW7lsl27Pt3bXKIIo57enK24a9Gs/vlwKDlbofKNESsvhnwgqJi
+beTCzeKSByeibHNFBnGnCx3mcHZdqsIV+f5HruA/FknW38gWSDCgXTn/6AOn/v+0
+3bqf83OfGc4swVqS8u1rxZRUrttZ0oSHnUp4nUGLFuuNb+Tfzc0mAOUeaDSQtpoI
+SCwLYEjFVZzvq8STuavyIlAoew3yJ8xWM8rjQTiZZQ4SRGTcUJ+tXFa3oCbUbK+W
+Vlg/5diB5GprOG+I4PLWNNuI
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MIIDLjCCAhagAwIBAgIQY5WTY8JOcIJxWRi/w9ftVjANBgkqhkiG9w0BAQsFADBP
+MQswCQYDVQQGEwJVUzEpMCcGA1UEChMgSW50ZXJuZXQgU2VjdXJpdHkgUmVzZWFy
+Y2ggR3JvdXAxFTATBgNVBAMTDElTUkcgUm9vdCBYMTAeFw0yNDAzMTMwMDAwMDBa
+Fw0yNzAzMTIyMzU5NTlaMDIxCzAJBgNVBAYTAlVTMRYwFAYDVQQKEw1MZXQncyBF
+bmNyeXB0MQswCQYDVQQDEwJFODCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoC
+ggEBAIohGpFclMU3EEOolJglgDcc7kK/+M8IoOZrfV8cqI2EZ4u4ImomNuq+TGTM
+azfgBqWkvNhBVZ3kQCwYjRVsB0A9K5PJoF0F/eiVmxkW8tpEfRdHmVh0PFpW5j6q
+7T4FiCepKx6Z1Gk3TG3unc2T8NzHQZoHH/e6COWh/5rWP3hg0Wrployqp6vQTAeS
+O+FT4Xce++3yBHoeR8V5gWoSO/CxJa/Zg87YQgKcSgWs9MASTR4dA6xcjK04oZZQ
+4lT7t2arb87KUxVmATLzAvcIHzJ+L3wsbPt0BsHcrJdl4BUDeKO2L98jWBJKNw4F
+o7LK308cQaxK+Z3O6BLFJKm0XD8CAwEAAaMjMCEwDwYDVR0TAQH/BAUwAwEB/zAO
+BgNVHQ8BAf8EBAMCAYYwDQYJKoZIhvcNAQELBQADggEBAG1NiqV/RaSOFAfrG0or
+/tyWe2m+gVZIZUdGZNOTEMHdhsRBHn38aX49LkG1OXbdlGH6pH+egbcjx7qGtBhZ
+3vTxYKg9OMQ0eSEIiLH1pRilXDND2afazsIXgvkRP8zertZ3iZbv34pDw2U3pvwu
+9sWSvrSWjkL1zUMSDu6HKKnSAMcGAMNPZuDbqzTezJkYlDnYJmHapsjIdriU4Rcu
+PvnwhyeqUQcRumykzoans8eNOF596Qls3NOMqUu2wfZ1QI1vUlGS7/QSnLPqLf3c
+MYHlE6cZk/OE1JYb5oss3AOXm+OogxF8GVQz8VzTA/66LiazWwtt/P/Ys6HsWG9S
+unc=
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MIIDTDCCAjSgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
+TzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh
+cmNoIEdyb3VwMRUwEwYDVQQDEwxJU1JHIFJvb3QgWDEwHhcNMTUwNjA0MTEwNDM4
+WhcNMzUwNjA0MTEwNDM4WjBPMQswCQYDVQQGEwJVUzEpMCcGA1UEChMgSW50ZXJu
+ZXQgU2VjdXJpdHkgUmVzZWFyY2ggR3JvdXAxFTATBgNVBAMTDElTUkcgUm9vdCBY
+MTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAILyBUySOAZK3ceBJJjY
+WKAVeGwS94jGBfKKmTAIrP3roYpGxJNI8jtJITSVOUAZm40KHR/GOlNpzzN+gMDF
+StJu0J5kgLF8zymjnLnlVZo5Id30CbyEyx3JzS3wOtaC+sj449kH0v43FGIsUN4R
+4okXTztidaHnLplUAfqA/cP37nzSv915Rj14YyGIN8Qxn8KJA3oWTD634lGYWsC+
+b2y9WnwSH4lNXiuAKfREnJHanUAWEYOGjCP9qxFYS3i+z7UuBMi+SLhuHpLe5G4X
+PUaSq6oAUoTgXsqqTPX3YeN2GvIkg1PltB4A0xc0z2+AjuRQARhb/BshUl/Shgvp
+bzsCAwEAAaMjMCEwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAQYwDQYJ
+KoZIhvcNAQELBQADggEBAEIQBjSZmPOOD/JdOjl3GAHhBrjxCdwbWdA7ox0azBTM
+CPXuHkt/RNjX8Y1qEklAluOrRNvmQ5sexsTxkqKj+cIiYDHT9D1dobgxvPfrrk5f
+0Rx2rBFr+/3jxctk7m8gc/7+TMDmkNNN/QPYf2vLOAhzyyVtC7oARAsf5+IUwiQ1
+QlDSr6U+kLIZ1+vggbVUy4DOWMa/A10nXkA3/o/asyqfdNXG1brFnxDSpdtKQBkD
+EOqhlAh4iEua5iBWizhbj+yAAqtkQjjv3ddy2PPRaYLulHfQMf43nypx8s9X+21e
+DviXnIIbs6B7GR+q0tUsYpkjwKprqPuM+gziA2LL1aQ=
+-----END CERTIFICATE-----`
+
+const keyPEM = `-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEAyY+Wzh6QuTp3RlQweXd8LNkE86U4jYeXoanyHpScTrVFopon
+wtmR81i2+NugwwApBYc0eEooVexJflyO6yKVOK3UV/PBXmkcE9jZsdLIoMl0Q1fl
+mSX8U2Hx5sNiamy1f0cbKc+XaKFC0pjzlqniE9pKRwISUmq/T5nHDTKIv1kpOwPU
+08+TPV1fxMq1DvBF+zIXaHTJlicjSGRWtU1pdkulgHpZkLVVuTJA0o3CpBOi2JOh
+/IkROaZICOmwMmc74mkyUeLSjn8nLHHsd5Ab2UsKUL5XmaSY0iCpp6ql38luC5xT
+Yd0hjdRuPxzyosp22vWmkOyrU2xwJOY1bwX1AQIDAQABAoIBAFDyqc392IGLSXul
+NBKUOfqI7cQsBppQakUyy1octOmnQ2AaKP3IAyWH63PmQJoP5mmh8yCcJ7baPmnR
+IlSsfuFUboMkEfSooe4WmNchoBFy1o51LnBjIQMbwtq6fTvgjMOg+ve/tz7+BKgv
+ZSSM9Y6jjFEYM+OFm2+MgrR6JxExNsDtG8sjGam0AKAwQPRfa2WLiCu1vdZCm1kk
+HkUCQG1VB5Ew5rYVFgetDxgOVWQohi93O35TxyCaNc0QW2gL65XcKYATlByw1nYG
+hDVog3AVW0hsRlvVAGvunzyApq1NUVz2qlnLm3vNQLfEMP/Iu3Df1RNpNeZfrnKF
+oC3yrEECgYEA9Aj6MZNxAsbu/QOpGt23OqugIfvRzj3hKKIpnC5KjWebm+bocnC8
+yVihyof9b+VI988ncmwzwbBm2vfztFMT7o+bWmHlGtzhMNDThs92o30UgWG5laK1
+570Ed8vJi4XrD89DLiTXpBdJ+LgFZ/YmvMX3q40Yh2+UgM7iN5+zNQMCgYEA03F+
+iuTfr06dSJGoXF1qiNmyMeQs7TjVStYqoJrtBP2EGqhtaQCTbl+Zu84XHh7U1rBu
+ad5OuLHaNXAkbsvNHp6EZUeioyYhbuYnFxtK30yQr4y/NLxOv2QFNaQq1l0ZDQ5c
+f37KxNJt27knpChrv78iVqU5+5ZxzJxRT1JUhKsCgYEA8xTyK2nju1Fvg4Ye700F
+FCMbCl7tmVPYMYJ+kj0mM/6NaVk0F7KmyqVH3Bdj4w7whS/K6lZPo9LUUa+FCQ1s
+IEjaBcjXzs9QXTDWU0XatnWEdHBkzWHbcq+8gJv08c7+26uoDpHSX3h3TZH4iJsP
+8R/9WdvdICOMOFZbze59MwMCgYAn+jJpwmJEfAGi4d9KL2NgIoDdi/2ukGtLbfi7
+Su97XQ9oFuYwzyoQ2URwzMN0L3IgcVU+8QhDRWUza1OIG0JaArCXkZa/cAssM5m6
+da+PTqOgfWT9bIkbCKcvgC2VQB7naAq3FFr0IbEhtP04vWe55kJwzWaMGeLEQ93f
+uHpAZwKBgQDN3YCX9HGOh1EcFDP394qA1wZbFQxZafvv43q7QqxZKei6Mj5B8hKA
+mCdxjwQhKKmI6N8oKNFsGLrSMyDVRHDZ+FW13mdeBS6YiwwcXLLDIEcdQXpuuJIg
+c6NVcA7ozo/YggnqQ8hoZIrOI85Hl9F7SLOVDOy6Goc4oe9FRYlI0Q==
+-----END RSA PRIVATE KEY-----`
+
+var response = []byte("HTTP/1.1 418 I'm a teapot\r\nContent-Length: 0\r\nServer: coffee\r\n\r\n")
+
+type readWrapper struct {
+	net.Conn
+	r *bufio.Reader
+}
+
+func (rw *readWrapper) Read(p []byte) (int, error) {
+	return rw.r.Read(p)
+}
+
+func handle(conn net.Conn, tlsConfig *tls.Config) {
+	defer conn.Close()
+
+	conn.SetDeadline(time.Now().Add(5 * time.Second))
+
+	reader := bufio.NewReader(conn)
+
+	peek, err := reader.Peek(1)
+	if err != nil {
+		return
+	}
+
+	if peek[0] == 0x16 {
+
+		tlsConn := tls.Server(&readWrapper{conn, reader}, tlsConfig)
+
+		if err := tlsConn.Handshake(); err != nil {
+			return
+		}
+
+		buf := make([]byte, 4096)
+		tlsConn.Read(buf)
+
+		tlsConn.Write(response)
+		return
+	}
+
+	line, err := reader.ReadBytes('\n')
+	if err != nil {
+		return
+	}
+
+	if bytes.HasPrefix(line, []byte("GET")) ||
+		bytes.HasPrefix(line, []byte("POST")) ||
+		bytes.HasPrefix(line, []byte("HEAD")) ||
+		bytes.HasPrefix(line, []byte("PUT")) ||
+		bytes.HasPrefix(line, []byte("DELETE")) ||
+		bytes.HasPrefix(line, []byte("OPTIONS")) {
+
+		conn.Write(response)
+	}
+}
+
+func main() {
+
+	cert, err := tls.X509KeyPair([]byte(certPEM), []byte(keyPEM))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}
+
+	ln, err := net.Listen("tcp", ":443")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("Listening on :443")
+
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			continue
+		}
+
+		go handle(conn, tlsConfig)
+	}
+}
